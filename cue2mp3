@@ -1,0 +1,149 @@
+#!/usr/bin/sh
+
+# convert all cue + iso files to mp3 set
+
+# reguire:
+#
+# bchunk (bchunk)
+# mac (mac)
+# flac (flac)
+# ttaenc (ttaenc)
+# wvunpack (wavpack)
+# lame (lame)
+# mp4info (mp4v2)
+# php (php5)
+# eyeD3 (python-eyeD3)
+# python (python)
+#
+
+for file in *.cue; do 
+
+  cat "$file" | while read line
+  do
+    iso=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/^FILE\s\"([\p{L}[:print:]]+)\"\sWAVE/u", $_GET["input"], $out)) {echo "{$out[1]}";} else {echo "";}' input="$line"`
+    if [ "$iso" != "" ]
+    then
+      isotype=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/\.([[:print:]]{2,4}+)$/", $_GET["input"], $out)) {echo "{$out[1]}";} else {echo "";}' input="$iso"`
+      if [ "$isotype" = "ape" ]
+      then
+        mac "${iso}" image.wav -d
+      elif [ "$isotype" = "flac" ]
+      then
+        flac -d "${iso}" -o image.wav
+      elif [ "$isotype" = "mp3" ]
+      then
+        lame --decode "${iso}" -o image.wav
+      elif [ "$isotype" = "tta" ]
+      then
+        ttaenc -d "${iso}" -o image.wav
+      elif [ "$isotype" = "wav" ]
+      then
+        ln "${iso}" image.wav
+      elif [ "$isotype" = "wv" ]
+      then
+        wvunpack "${iso}" -o image.wav
+      fi
+      break
+    fi
+  done
+
+  bchunk -w image.wav "${file}" _track >&2
+  rm image.wav
+
+  for wav in _track*.wav; do
+    lame --cbr -b 320 --resample 44.1 "${wav}"
+  done
+
+  rm _track*.wav
+
+  total=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); $cue = fopen($_GET["input"], "r"); while (!feof($cue)) {$buffer = fgets($cue); if(preg_match("/\sTRACK\s([[:digit:]]{2,}+)\sAUDIO/", $buffer, $out)) {$max=$out[1];}} echo "$max"; fclose($cue);' input="$file"`
+  for mp3 in _track*.mp3; do
+    track=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/^_track([[:digit:]]{2,}+).mp3/", $_GET["input"], $out)) {echo "{$out[1]}";} else {echo "";}' input="$mp3"`    
+    cat "$file" | while read line
+    do
+      if [ "$isartist" = "" ]
+      then 
+        artist=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/^PERFORMER\s\"([\p{L}[:print:]]+)\"/u", $_GET["input"], $out)) {echo "{$out[1]}";} else {echo "";}' input="$line"`
+      fi
+      if [ "$artist" != "" -a "$isartist" = "" ]
+      then
+        isartist=1
+        eyeD3 --set-encoding=utf8 --artist="$artist" "$mp3"
+      continue
+      fi    
+      if [ "$isalbum" = "" ]
+      then
+        album=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/^TITLE\s\"([\p{L}[:print:]]+)\"/u", $_GET["input"], $out)) {echo "{$out[1]}";} else {echo "";}' input="$line"`
+      fi
+      if [ "$album" != "" -a "$isalbum" = "" ]
+      then
+        isalbum=1
+        eyeD3 --set-encoding=utf8 --album="$album" "$mp3"
+      continue
+      fi
+      if [ "$isyear" = "" ]
+      then
+        year=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/^REM\sDATE\s([[:digit:]]{4}+)/", $_GET["input"], $out)) {echo "{$out[1]}";} else {echo "";}' input="$line"`
+      fi 
+      if [ "$year" != "" -a "$isyear" = "" ]
+      then
+        isyear=1
+        eyeD3 --set-encoding=utf8 --year="$year" --set-text-frame="TDRC:$year" "$mp3"
+      continue
+      fi
+      if [ "$isgenre" = "" ]
+      then
+        genre=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/^REM\sGENRE\s([\p{L}[:print:]]+)/u", $_GET["input"], $out)) {echo "{$out[1]}";} else {echo "";}' input="$line"`
+      fi
+      if [ "$genre" != "" -a "$isgenre" = "" ]
+      then
+        isgenre=1
+        eyeD3 --set-encoding=utf8 --set-text-frame="TCON:$genre" "$mp3"
+      continue
+      fi
+      if [ "$istrack" = "" ]
+      then
+        trackno=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/TRACK\s([[:digit:]]{2,}+)\sAUDIO/", $_GET["input"], $out)) {echo "{$out[1]}";} else {echo "";}' input="$line"`
+      fi
+      if [ "$trackno" != "" -a "$istrack" = "" -a "$trackno" = "$track" ]
+      then
+        istrack=1
+      fi
+      if [ "$istrack" = 1 ]
+      then
+        title=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/^TITLE\s\"([\p{L}[:print:]]+)\"/u", $_GET["input"], $out)) {echo "{$out[1]}";} else {echo "";}' input="$line"`
+        if [ "$title" != "" ]
+        then
+          istrack=""
+          eyeD3 --set-encoding=utf8 --title="$title" --track="$trackno" --track-total="$total" "$mp3"
+          if [ "$dirready" = "" ]
+          then
+            mkdir ${year}" - "${album} > /dev/null 2>&1
+            dirready=1
+          fi
+          if [ -f "${file%.cue}.jpg" ]
+          then
+            eyeD3 --set-encoding=utf8 --add-image "${file%.cue}.jpg:FRONT_COVER" "$mp3"
+          elif [ -f "${file%.cue}.png" ]
+          then
+            eyeD3 --set-encoding=utf8 --add-image "${file%.cue}.png:FRONT_COVER" "$mp3"
+          elif [ -f "front.jpg" ]
+          then
+            eyeD3 --set-encoding=utf8 --add-image "front.jpg:FRONT_COVER" "$mp3"
+          elif [ -f "front.png" ]
+          then
+            eyeD3 --set-encoding=utf8 --add-image "front.png:FRONT_COVER" "$mp3"
+          elif [ -f "cover.jpg" ]
+          then
+            eyeD3 --set-encoding=utf8 --add-image "cover.jpg:FRONT_COVER" "$mp3"
+          elif [ -f "cover.png" ]
+          then
+            eyeD3 --set-encoding=utf8 --add-image "cover.png:FRONT_COVER" "$mp3"
+          fi
+          php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); $name = $_GET["year"] . " - " . $_GET["album"] . "/" . $_GET["no"] . " - " . $_GET["title"] . ".mp3"; rename($_GET["track"],$name);' track="$mp3" no="$trackno" title="$title" year="$year" album="$album"
+        fi
+      continue
+      fi
+    done
+  done
+done

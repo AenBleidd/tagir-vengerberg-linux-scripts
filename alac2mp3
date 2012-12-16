@@ -1,0 +1,34 @@
+#!/usr/bin/sh
+# convert all files from m4a to mp3
+
+# reguire:
+#
+# alac (alac_decoder)
+# lame (lame)
+# mp4info (mp4v2)
+# php (php5)
+# eyeD3 (python-eyeD3)
+# python (python)
+#
+
+for file in *.m4a; do 
+  $(alac "${file}" | lame --cbr -b 320 --resample 44.1 - "${file%.m4a}.mp3");
+  tag=`mp4info "${file}"`
+  tagName=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/Name:\s([\p{L}[:print:]]+)/u", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tagArtist=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/Artist:\s([\p{L}[:print:]]+)/u", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tagAlbum=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/Album:\s([\p{L}[:print:]]+)/u", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tagGenre=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/Genre:\s([\p{L}[:print:]]+)/u", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tagYear=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/Release Date:\s([[:digit:]]{4})/", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tagTrackNumber=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/Track:\s([[:digit:]]{1,2})/", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tagTrackTotal=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/Track:\s[[:digit:]]{1,2}\sof\s([[:digit:]]{1,2})/", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tagCover=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/Cover Art pieces:\s([[:digit:]]{1,2})/", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  eyeD3 --set-encoding=utf8 --title="$tagName" --artist="$tagArtist" --album="$tagAlbum" --set-text-frame="TCON:$tagGenre" --year="$tagYear" --set-text-frame="TDRC:$tagYear" --track="$tagTrackNumber" --track-total="$tagTrackTotal" "${file%.m4a}.mp3"
+  if [ $tagCover -gt 0 ]
+  then
+    coverPath=`mp4art --extract "${file}"`
+    coverName=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/->\s([\p{L}[:print:]]+)/u", $_GET["cover"], $out)) {echo "{$out[1]}";} else {echo "";}' cover="$coverPath"`
+    eyeD3 --set-encoding=utf8 --add-image "$coverName:FRONT_COVER" "${file%.m4a}.mp3"
+  rm "$coverName"
+  fi
+done
+
