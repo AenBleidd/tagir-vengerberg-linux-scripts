@@ -118,7 +118,7 @@ for file in *.cue; do
           eyeD3 --set-encoding=utf8 --title="$title" --track="$trackno" --track-total="$total" "$mp3"
           if [ "$dirready" = "" ]
           then
-            mkdir ${year}" - "${album} > /dev/null 2>&1
+            mkdir ${year}" - ""${album}" > /dev/null 2>&1
             dirready=1
           fi
           if [ -f "${file%.cue}.jpg" ]
@@ -140,7 +140,7 @@ for file in *.cue; do
           then
             eyeD3 --set-encoding=utf8 --add-image "cover.png:FRONT_COVER" "$mp3"
           fi
-          php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); $name = $_GET["year"] . " - " . $_GET["album"] . "/" . $_GET["no"] . " - " . $_GET["title"] . ".mp3"; rename($_GET["track"],$name);' track="$mp3" no="$trackno" title="$title" year="$year" album="$album"
+          php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); $name = $_GET["year"] . " - " . $_GET["album"] . "/" . $_GET["no"] . " - " . $_GET["title"] . ".mp3"; rename($_GET["track"], $name);' track="$mp3" no="$trackno" title="$title" year="$year" album="$album"
         fi
       continue
       fi
