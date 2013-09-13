@@ -1,0 +1,36 @@
+#!/usr/bin/sh
+# convert all files from flac to mp3
+
+# reguire:
+#
+# flac (alac)
+# lame (lame)
+# mp4info (mp4v2)
+# php (php5)
+# eyeD3 (python-eyeD3)
+# python (python)
+#
+
+for file in *.flac; do 
+  $(flac -cd "${file}" | lame --cbr -b 320 --resample 44.1 - "${file%.flac}.mp3");
+  tag=`metaflac --show-tag=TITLE "${file}"`
+  tagName=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/TITLE=([\p{L}[:print:]]+)/u", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tag=`metaflac --show-tag=ARTIST "${file}"`
+  tagArtist=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/ARTIST=([\p{L}[:print:]]+)/u", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tag=`metaflac --show-tag=ALBUM "${file}"`
+  tagAlbum=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/ALBUM=([\p{L}[:print:]]+)/u", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tag=`metaflac --show-tag=GENRE "${file}"`
+  tagGenre=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/GENRE=([\p{L}[:print:]]+)/u", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tag=`metaflac --show-tag=DATE "${file}"`
+  tagYear=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/DATE=([[:digit:]]{4})/", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tag=`metaflac --show-tag=TRACKNUMBER "${file}"`
+  tagTrackNumber=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/TRACKNUMBER=([[:digit:]]{1,2})/", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tag=`metaflac --show-tag=TRACKTOTAL "${file}"`
+  tagTrackTotal=`php -r 'parse_str(implode("&", array_slice($argv, 1)), $_GET); if(preg_match("/TRACKTOTAL=([[:digit:]]{1,2})/", $_GET["tag"], $out)) {echo "{$out[1]}";} else {echo "";}' tag="$tag"`
+  tag=`metaflac --show-tag=DATE "${file}"`
+  eyeD3 --set-encoding=utf8 --title="$tagName" --artist="$tagArtist" --album="$tagAlbum" --set-text-frame="TCON:$tagGenre" --year="$tagYear" --set-text-frame="TDRC:$tagYear" --track="$tagTrackNumber" --track-total="$tagTrackTotal" "${file%.flac}.mp3"
+  coverPath=`metaflac --export-picture-to="${file%.flac}.jpg" "${file}"`
+  eyeD3 --set-encoding=utf8 --add-image "$coverPath:FRONT_COVER" "${file%.flac}.mp3"
+  rm "$coverName"
+done
+
